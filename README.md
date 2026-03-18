@@ -8,60 +8,115 @@ The implementation uses a streaming reader, batched worker pool, local per-worke
 
 ## Quick Start With Docker
 
-This repository is set up so another machine can run it with Docker only.
+This repository is designed so another machine can run it immediately with Docker.
 
-### 1. Build the image
+### Simplest flow
+
+1. Clone the repository
+2. Put your input file at the project root with this exact name:
+
+```text
+ad_data.csv
+```
+
+3. Run:
+
+```bash
+mkdir -p results
+docker compose up aggregator
+```
+
+That is the main recommended path.
+
+Results will be written to:
+- `results/top10_ctr.csv`
+- `results/top10_cpa.csv`
+
+### Why this is the simplest option
+
+- no Go installation required
+- no long `docker run` command required
+- user only needs to place `ad_data.csv` in the repo root
+- `docker-compose.yml` already mounts the input and output paths correctly
+
+### Read a file from anywhere, for example `Downloads`
+
+You do not need to move the CSV into this repository.
+
+Example:
+
+```bash
+mkdir -p results
+
+INPUT_DIR="$HOME/Downloads" \
+INPUT_FILE="ad_data.csv" \
+docker compose up aggregator
+```
+
+If your file has a different name:
+
+```bash
+mkdir -p results
+
+INPUT_DIR="$HOME/Downloads" \
+INPUT_FILE="my-big-file.csv" \
+docker compose up aggregator
+```
+
+If you want output somewhere else too:
+
+```bash
+INPUT_DIR="$HOME/Downloads" \
+INPUT_FILE="my-big-file.csv" \
+OUTPUT_DIR="$HOME/Desktop/ad-results" \
+docker compose up aggregator
+```
+
+## Docker Commands
+
+### Build manually
 
 ```bash
 docker build -t ad-aggregator .
 ```
 
-### 2. Run with the sample CSV included in this repo
+### Run manually
+
+If `ad_data.csv` is already in the project root:
 
 ```bash
 mkdir -p results
 
 docker run --rm \
-  -v "$(pwd)/sample-data:/data:ro" \
+  -v "$(pwd):/workspace:ro" \
   -v "$(pwd)/results:/results" \
-  ad-aggregator /data/ad_data.csv /results/
+  ad-aggregator
 ```
 
-This writes:
-- `results/top10_ctr.csv`
-- `results/top10_cpa.csv`
+The image now defaults to:
 
-### 3. Run with your own CSV
-
-Put your CSV inside any local folder, then mount that folder to `/data`:
-
-```bash
-mkdir -p results
-
-docker run --rm \
-  -v "/absolute/path/to/your/input-folder:/data:ro" \
-  -v "$(pwd)/results:/results" \
-  ad-aggregator /data/ad_data.csv /results/
+```text
+--input=/workspace/ad_data.csv --output=/results/
 ```
 
-If your file name is different, pass that path instead:
+So users do not need to pass those flags manually.
+
+If the CSV is outside the repo, mount its parent directory:
 
 ```bash
 docker run --rm \
-  -v "/absolute/path/to/your/input-folder:/data:ro" \
+  -v "$HOME/Downloads:/input:ro" \
   -v "$(pwd)/results:/results" \
-  ad-aggregator /data/my-file.csv /results/
+  ad-aggregator --input /input/ad_data.csv --output /results/
 ```
 
-### Docker Compose
-
-The included compose file also works out of the box with the sample data:
+### Run tests in Docker
 
 ```bash
-docker compose up aggregator
+docker build --target tester -t ad-aggregator:test .
 ```
 
-To run containerized tests:
+Or:
 
 ```bash
 docker compose --profile test up test
@@ -72,26 +127,26 @@ docker compose --profile test up test
 Docker is the recommended path for reproducible execution. Local Go execution is also supported if Go `1.22+` is installed.
 
 ```bash
-go run . sample-data/ad_data.csv
+go run . ad_data.csv
 ```
 
 Custom output directory:
 
 ```bash
-go run . sample-data/ad_data.csv results/
+go run . ad_data.csv results/
 ```
 
 Flag-based form:
 
 ```bash
-go run . --input sample-data/ad_data.csv --output results/
+go run . --input ad_data.csv --output results/
 ```
 
 Build binary locally:
 
 ```bash
 go build -o ad-aggregator .
-./ad-aggregator sample-data/ad_data.csv
+./ad-aggregator ad_data.csv
 ```
 
 ## Setup Instructions
@@ -196,17 +251,6 @@ Written: results/top10_cpa.csv (10 rows)
 2025/01/01 12:00:10 Done! Total time: 10.02s
 ```
 
-Example local run on the repository sample data:
-
-```text
-2026/03/18 21:27:55 Starting: input=ad_data.csv workers=10 batch=8000
-2026/03/18 21:27:55 Aggregated 50 campaigns in 5.61s
-2026/03/18 21:27:55 Written: results/top10_ctr.csv (10 rows)
-2026/03/18 21:27:55 Written: results/top10_cpa.csv (10 rows)
-2026/03/18 21:27:55 Memory - PeakHeapAlloc: 6.13 MB | HeapAlloc: 3.11 MB | TotalAlloc: 5334.68 MB | Sys: 16.64 MB
-2026/03/18 21:27:55 Done! Total time: 5.61s
-```
-
 ## Dockerfile
 
 This repository includes a multi-stage [Dockerfile](/Users/dunglda/Documents/WORKING/analytics_csv/Dockerfile):
@@ -214,18 +258,18 @@ This repository includes a multi-stage [Dockerfile](/Users/dunglda/Documents/WOR
 - `tester` runs `go test -race -v ./tests/`
 - final `scratch` image ships only the compiled binary
 
-Container test command:
-
-```bash
-docker build --target tester -t ad-aggregator:test .
-```
-
 ## Test Commands
 
 Local:
 
 ```bash
 go test -race -v ./tests/
+```
+
+Containerized:
+
+```bash
+docker compose --profile test up test
 ```
 
 Current test coverage includes:

@@ -1,23 +1,19 @@
 services:
-  # ── Main job: process ad_data.csv ─────────────────────────────────────────
   aggregator:
     build:
       context: .
     image: ad-aggregator:latest
     volumes:
-      - ./ad_data.csv:/data/ad_data.csv:ro   # mount CSV read-only
-      - ./results:/results                    # write outputs here
+      - ${INPUT_DIR:-.}:/input:ro
+      - ${OUTPUT_DIR:-./results}:/results
     command:
-      - --input=/data/ad_data.csv
+      - --input=/input/${INPUT_FILE:-ad_data.csv}
       - --output=/results/
-      - --workers=8
-      - --batch=8000
 
-  # ── Test runner: run go test inside Docker ────────────────────────────────
   test:
     build:
       context: .
       target: tester
     image: ad-aggregator:test
     profiles:
-      - test   # only runs with: docker compose --profile test up test
+      - test

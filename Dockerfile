@@ -33,4 +33,4 @@ COPY --from=builder /app/ad-aggregator /ad-aggregator
 VOLUME ["/data", "/results"]
 
 ENTRYPOINT ["/ad-aggregator"]
-CMD ["--help"]
+CMD ["--input=/workspace/ad_data.csv", "--output=/results/"]
