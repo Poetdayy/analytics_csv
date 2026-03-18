@@ -60,8 +60,7 @@ Implement the missing Go application described by `README.md` so the repo can ac
 - If the README does not define tie-breaking precisely, ranking should be deterministic by metric first, then `campaign_id` ascending.
 
 ---
-
-Task 1 — Project scaffold & CLI
+## Task 1 — Project scaffold & CLI
 Việc cần làm:
 
 go mod init project
@@ -71,7 +70,7 @@ Tạo output dir nếu chưa có
 
 Acceptance: go run . --input foo.csv --output results/ chạy không panic, tạo được folder
 
-Task 2 — CSV parser + Row struct
+## Task 2 — CSV parser + Row struct
 Việc cần làm:
 
 Định nghĩa struct Row { CampaignID string; Date string; Impressions int64; Clicks int64; Spend float64; Conversions int64 }
@@ -81,7 +80,7 @@ Handle parse error gracefully (log và skip dòng lỗi)
 
 Acceptance: parse được 1000 dòng sample, struct đúng giá trị
 
-Task 3 — Worker pool (goroutines + channels)
+## Task 3 — Worker pool (goroutines + channels)
 Việc cần làm:
 
 Reader goroutine đọc file, batch N dòng thành []Row, đẩy vào jobs chan
@@ -99,7 +98,7 @@ gotype Stats struct {
 }
 Acceptance: chạy với file nhỏ, không race condition (go test -race)
 
-Task 4 — Merger & final aggregation
+## Task 4 — Merger & final aggregation
 Việc cần làm:
 
 Merger goroutine đọc từ results chan, merge tất cả partial maps vào một global map[string]*Stats
@@ -108,7 +107,7 @@ CPA = nil nếu TotalConversions == 0
 
 Acceptance: kết quả đúng với test data nhỏ có expected output
 
-Task 5 — Sort & write CSV output
+## Task 5 — Sort & write CSV output
 Việc cần làm:
 
 Convert map sang slice để sort
@@ -119,7 +118,7 @@ Column order đúng với spec: campaign_id, total_impressions, total_clicks, to
 
 Acceptance: 2 file CSV output đúng format, giá trị chính xác
 
-Task 6 — Benchmark & README
+## Task 6 — Benchmark & README
 Việc cần làm:
 
 Đo thời gian chạy bằng time.Now() / time.Since()
@@ -129,13 +128,13 @@ Viết README với setup, run instructions, kết quả benchmark
 
 Acceptance: README đầy đủ, có số liệu cụ thể
 
-Một vài Go-specific tips quan trọng
+## Một vài Go-specific tips quan trọng
 Batch size: đừng push từng Row vào channel — overhead quá lớn. Batch 5000–10000 dòng mỗi lần là sweet spot.
 Tránh global mutex: mỗi worker giữ local map riêng, chỉ merge 1 lần ở cuối. Đây là lý do tại sao architecture trên không cần sync.Mutex trong hot path.
 String interning cho campaign_id: nếu muốn tối ưu thêm, campaign_id lặp đi lặp lại hàng triệu lần — có thể dùng một sync.Map nhỏ để intern string, giảm GC pressure.
 Parse số thủ công: strconv.ParseInt và strconv.ParseFloat đã khá nhanh, dùng trực tiếp thay vì reflect-based CSV decoder.
 
-Tôi cần triển khai các bước này để project tôi chạy được, hãy triển khai thành từng mục nhỏ và phân tích kỹ bạn làm như nào cho tôi, tốt nhất là hãy làm từng mục,  sau đó test cho tôi đảm bảo input cho ra đúng output bài toán.
+Tôi cần triển khai các bước này để project tôi chạy được, hãy triển khai thành từng mục nhỏ tôi đã break ở trên và phân tích kỹ logic handle các công việc, sau đó test cho tôi đảm bảo input cho ra đúng output bài toán.
 
 
 
