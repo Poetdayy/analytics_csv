@@ -439,6 +439,7 @@ var (
 func startMemoryMonitor() func() {
 	done := make(chan struct{})
 	ticker := time.NewTicker(10 * time.Millisecond)
+	recordPeakHeap()
 
 	go func() {
 		defer ticker.Stop()
