@@ -76,9 +76,10 @@ type RunStats struct {
 }
 
 type MemoryStats struct {
-	HeapAllocMB  float64
-	TotalAllocMB float64
-	SysMB        float64
+	PeakHeapAllocMB float64
+	HeapAllocMB     float64
+	TotalAllocMB    float64
+	SysMB           float64
 }
 
 type parseStats struct {
@@ -101,6 +102,10 @@ func Run(cfg Config) (RunStats, error) {
 	}
 
 	start := time.Now()
+	resetPeakHeap()
+	stopMemoryMonitor := startMemoryMonitor()
+	defer stopMemoryMonitor()
+
 	campaignStats, parserStats, err := aggregateFile(cfg.InputPath, cfg.Workers, cfg.BatchSize)
 	if err != nil {
 		return RunStats{}, err
@@ -136,7 +141,7 @@ func Run(cfg Config) (RunStats, error) {
 
 func ParseLine(line string) (Row, error) {
 	parts := splitCSVLine(line)
-	if len(parts) < 6 {
+	if len(parts) != 6 {
 		return Row{}, fmt.Errorf("expected 6 columns, got %d", len(parts))
 	}
 
@@ -144,17 +149,29 @@ func ParseLine(line string) (Row, error) {
 	if err != nil {
 		return Row{}, fmt.Errorf("invalid impressions: %w", err)
 	}
+	if impressions < 0 {
+		return Row{}, fmt.Errorf("invalid impressions: must be non-negative")
+	}
 	clicks, err := strconv.ParseInt(parts[3], 10, 64)
 	if err != nil {
 		return Row{}, fmt.Errorf("invalid clicks: %w", err)
+	}
+	if clicks < 0 {
+		return Row{}, fmt.Errorf("invalid clicks: must be non-negative")
 	}
 	spend, err := strconv.ParseFloat(parts[4], 64)
 	if err != nil {
 		return Row{}, fmt.Errorf("invalid spend: %w", err)
 	}
+	if spend < 0 {
+		return Row{}, fmt.Errorf("invalid spend: must be non-negative")
+	}
 	conversions, err := strconv.ParseInt(parts[5], 10, 64)
 	if err != nil {
 		return Row{}, fmt.Errorf("invalid conversions: %w", err)
+	}
+	if conversions < 0 {
+		return Row{}, fmt.Errorf("invalid conversions: must be non-negative")
 	}
 
 	return Row{
@@ -407,8 +424,59 @@ func currentMemoryStats() MemoryStats {
 	var ms runtime.MemStats
 	runtime.ReadMemStats(&ms)
 	return MemoryStats{
-		HeapAllocMB:  float64(ms.HeapAlloc) / (1024 * 1024),
-		TotalAllocMB: float64(ms.TotalAlloc) / (1024 * 1024),
-		SysMB:        float64(ms.Sys) / (1024 * 1024),
+		PeakHeapAllocMB: peakHeapAllocMB(),
+		HeapAllocMB:     float64(ms.HeapAlloc) / (1024 * 1024),
+		TotalAllocMB:    float64(ms.TotalAlloc) / (1024 * 1024),
+		SysMB:           float64(ms.Sys) / (1024 * 1024),
 	}
+}
+
+var (
+	peakHeapMu sync.Mutex
+	peakHeap   uint64
+)
+
+func startMemoryMonitor() func() {
+	done := make(chan struct{})
+	ticker := time.NewTicker(10 * time.Millisecond)
+
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				recordPeakHeap()
+			case <-done:
+				recordPeakHeap()
+				return
+			}
+		}
+	}()
+
+	return func() {
+		close(done)
+	}
+}
+
+func recordPeakHeap() {
+	var ms runtime.MemStats
+	runtime.ReadMemStats(&ms)
+
+	peakHeapMu.Lock()
+	if ms.HeapAlloc > peakHeap {
+		peakHeap = ms.HeapAlloc
+	}
+	peakHeapMu.Unlock()
+}
+
+func peakHeapAllocMB() float64 {
+	peakHeapMu.Lock()
+	defer peakHeapMu.Unlock()
+	return float64(peakHeap) / (1024 * 1024)
+}
+
+func resetPeakHeap() {
+	peakHeapMu.Lock()
+	peakHeap = 0
+	peakHeapMu.Unlock()
 }

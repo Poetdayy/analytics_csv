@@ -51,7 +51,8 @@ func main() {
 	log.Printf("Written: %s (%d rows)", stats.CTROutputPath, stats.CTRRows)
 	log.Printf("Written: %s (%d rows)", stats.CPAOutputPath, stats.CPARows)
 	log.Printf(
-		"Memory - HeapAlloc: %.2f MB | TotalAlloc: %.2f MB | Sys: %.2f MB",
+		"Memory - PeakHeapAlloc: %.2f MB | HeapAlloc: %.2f MB | TotalAlloc: %.2f MB | Sys: %.2f MB",
+		stats.Memory.PeakHeapAllocMB,
 		stats.Memory.HeapAllocMB,
 		stats.Memory.TotalAllocMB,
 		stats.Memory.SysMB,

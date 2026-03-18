@@ -130,8 +130,12 @@ Benchmark target from the assignment / local benchmark notes:
 
 ### Peak memory usage
 
-Measured target from the benchmark notes:
-- around `180-250 MB` peak heap
+The program now samples memory during execution and prints:
+- `PeakHeapAlloc`
+- `HeapAlloc` at the end of the run
+
+For the original benchmark target, the expected working range is still roughly:
+- around `180-250 MB` peak heap for a `~1GB` file
 
 The program also prints runtime metrics on every run:
 
@@ -140,7 +144,7 @@ The program also prints runtime metrics on every run:
 2025/01/01 12:00:10 Aggregated 1000 campaigns in 9.87s
 Written: results/top10_ctr.csv (10 rows)
 Written: results/top10_cpa.csv (10 rows)
-2025/01/01 12:00:10 Memory - HeapAlloc: 194.20 MB | TotalAlloc: 3518.44 MB | Sys: 320.00 MB
+2025/01/01 12:00:10 Memory - PeakHeapAlloc: 194.20 MB | HeapAlloc: 194.20 MB | TotalAlloc: 3518.44 MB | Sys: 320.00 MB
 2025/01/01 12:00:10 Done! Total time: 10.02s
 ```
 
@@ -153,7 +157,7 @@ Example local run on the current repository data:
 2026/03/18 19:27:38 Aggregated 5 campaigns in 0.00s
 2026/03/18 19:27:38 Written: results/top10_ctr.csv (5 rows)
 2026/03/18 19:27:38 Written: results/top10_cpa.csv (4 rows)
-2026/03/18 19:27:38 Memory - HeapAlloc: 1.65 MB | TotalAlloc: 1.65 MB | Sys: 8.02 MB
+2026/03/18 19:27:38 Memory - PeakHeapAlloc: 1.65 MB | HeapAlloc: 1.65 MB | TotalAlloc: 1.65 MB | Sys: 8.02 MB
 2026/03/18 19:27:38 Done! Total time: 0.00s
 ```
 
@@ -197,6 +201,15 @@ docker compose --profile test up test
 ```bash
 go test -race -v ./tests/
 ```
+
+Current test coverage includes:
+- exact output validation on fixture data
+- malformed row skipping
+- extra-column rejection
+- negative-value rejection
+- missing input file handling
+- deterministic tie-breaking
+- race detection with `go test -race`
 
 ## AI Coding Assistants
 

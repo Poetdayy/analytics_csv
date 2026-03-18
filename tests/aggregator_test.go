@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -26,6 +27,24 @@ func TestParseLineParsesExpectedRow(t *testing.T) {
 	}
 }
 
+func TestParseLineRejectsExtraColumns(t *testing.T) {
+	t.Parallel()
+
+	_, err := aggregator.ParseLine("CMP001,2026-03-01,100,10,50.25,2,extra")
+	if err == nil {
+		t.Fatal("ParseLine() error = nil, want extra column error")
+	}
+}
+
+func TestParseLineRejectsNegativeValues(t *testing.T) {
+	t.Parallel()
+
+	_, err := aggregator.ParseLine("CMP001,2026-03-01,-100,10,50.25,2")
+	if err == nil {
+		t.Fatal("ParseLine() error = nil, want negative value error")
+	}
+}
+
 func TestParseLineHandlesThousandRows(t *testing.T) {
 	t.Parallel()
 
@@ -45,7 +64,7 @@ func TestRunEndToEnd(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	input := filepath.Join("testdata", "sample_ad_data.csv")
+	input := fixturePath("sample_ad_data.csv")
 
 	stats, err := aggregator.Run(aggregator.Config{
 		InputPath: input,
@@ -89,7 +108,7 @@ func TestRunCreatesOutputDir(t *testing.T) {
 	outputDir := filepath.Join(base, "nested", "results")
 
 	_, err := aggregator.Run(aggregator.Config{
-		InputPath: filepath.Join("testdata", "sample_ad_data.csv"),
+		InputPath: fixturePath("sample_ad_data.csv"),
 		OutputDir: outputDir,
 		Workers:   2,
 		BatchSize: 2,
@@ -100,6 +119,20 @@ func TestRunCreatesOutputDir(t *testing.T) {
 
 	if _, err := os.Stat(outputDir); err != nil {
 		t.Fatalf("output dir not created: %v", err)
+	}
+}
+
+func TestRunMissingInputFile(t *testing.T) {
+	t.Parallel()
+
+	_, err := aggregator.Run(aggregator.Config{
+		InputPath: filepath.Join(t.TempDir(), "missing.csv"),
+		OutputDir: t.TempDir(),
+		Workers:   1,
+		BatchSize: 1,
+	})
+	if err == nil {
+		t.Fatal("Run() error = nil, want missing file error")
 	}
 }
 
@@ -136,6 +169,8 @@ func TestRunSkipsMalformedRows(t *testing.T) {
 		"campaign_id,date,impressions,clicks,spend,conversions",
 		"CMP001,2026-03-01,100,10,12.50,1",
 		"CMP002,2026-03-01,200,abc,30.00,2",
+		"CMP002,2026-03-01,200,10,30.00,2,extra",
+		"CMP002,2026-03-01,-200,10,30.00,2",
 		"CMP003,2026-03-01,100,5,10.00,1",
 	}, "\n")
 	if err := os.WriteFile(input, []byte(content), 0o644); err != nil {
@@ -152,8 +187,8 @@ func TestRunSkipsMalformedRows(t *testing.T) {
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	if stats.SkippedRows != 1 {
-		t.Fatalf("SkippedRows = %d, want 1", stats.SkippedRows)
+	if stats.SkippedRows != 3 {
+		t.Fatalf("SkippedRows = %d, want 3", stats.SkippedRows)
 	}
 
 	assertFileEquals(t, filepath.Join(tmpDir, "top10_ctr.csv"), strings.Join([]string{
@@ -206,4 +241,12 @@ func assertFileEquals(t *testing.T, path string, want string) {
 	if string(got) != want {
 		t.Fatalf("file %s mismatch\nwant:\n%s\ngot:\n%s", path, want, string(got))
 	}
+}
+
+func fixturePath(name string) string {
+	_, currentFile, _, ok := runtime.Caller(0)
+	if !ok {
+		return filepath.Join("testdata", name)
+	}
+	return filepath.Join(filepath.Dir(currentFile), "testdata", name)
 }
